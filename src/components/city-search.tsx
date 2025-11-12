@@ -1,0 +1,121 @@
+import React from 'react'
+import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command'
+import { Button } from './ui/button'
+import { Clock, Loader2, Search, XCircle } from 'lucide-react';
+import { useSearchLocationsQuery } from '@/hooks/use-weather';
+import { CommandSeparator } from 'cmdk';
+import { useNavigate } from 'react-router-dom';
+import { useSearchHistory } from '@/hooks/use-search-history';
+
+const CitySearch = () => {
+    const [open, setOpen] = React.useState(false);
+    const [query, setQuery] = React.useState('');
+    const navigate = useNavigate();
+
+    const { data: locations, isLoading } = useSearchLocationsQuery(query);
+    const { history, clearHistory, addToHistory } = useSearchHistory();
+
+    const handleSelect = (cityData: string) => {
+        const [lat, lon, name, country] = cityData.split("|");
+        
+        // Add search history - now matches the expected type
+        addToHistory.mutate({
+            query: query || name,
+            name: name.trim(),
+            lat: parseFloat(lat),
+            lon: parseFloat(lon),
+            country: country.trim(),
+        });
+
+        setOpen(false);
+        navigate(`/city/${name}?lat=${lat}&lon=${lon}`);
+    }
+
+    return (
+        <>
+            <Button 
+                className='text-muted-foreground mr-6 relative w-full md:w-40 lg:w-60 justify-start text-sm hover:bg-accent'
+                variant="outline"
+                onClick={() => setOpen(true)}
+            >
+                <Search className='mr-2 h-4 w-4' />
+                Search cities...
+            </Button>
+
+            <CommandDialog open={open} onOpenChange={setOpen}>
+                <CommandInput
+                    placeholder="Search cities..." 
+                    value={query}
+                    onValueChange={setQuery}
+                />
+                <CommandList>
+                    {query.length > 2 && !isLoading && (  
+                        <CommandEmpty>No cities found.</CommandEmpty>
+                    )}
+
+                    <CommandSeparator />
+                    
+                    {history.length > 0 && (
+                        <CommandGroup heading="Recent Searches">
+                            <div className='flex items-center justify-between px-2 my-2'>
+                                <p className='text-xs text-muted-foreground'>Recent Searches</p>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => clearHistory.mutate()}
+                                >
+                                    <XCircle className='h-4 w-4' />
+                                    Clear
+                                </Button>
+                            </div>
+
+                            {history.map((item) => (
+                                <CommandItem 
+                                    key={`${item.lat}-${item.lon}`}
+                                    value={`${item.lat}|${item.lon}|${item.name}|${item.country}`}
+                                    onSelect={handleSelect}
+                                >
+                                    <Clock className='h-4 w-4 text-muted-foreground mr-2' />
+                                    <span>
+                                        {item.name}
+                                        {item.state && `, ${item.state}`}
+                                        <span className='text-muted-foreground'>, {item.country}</span>
+                                    </span>
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    )}
+
+                    <CommandSeparator />
+                    
+                    {locations && locations.length > 0 && (
+                        <CommandGroup heading="Search Results">
+                            {isLoading && (
+                                <div className='flex items-center justify-center p-4'> 
+                                    <Loader2 className='h-4 w-4 animate-spin' />
+                                </div>
+                            )}
+
+                            {locations.map((location) => (
+                                <CommandItem
+                                    key={`${location.lat}-${location.lon}`}
+                                    value={`${location.lat}|${location.lon}|${location.name}|${location.country}`}
+                                    onSelect={handleSelect}
+                                > 
+                                    <Search className='mr-2 h-4 w-4' />
+                                    <span>
+                                        {location.name}
+                                        {location.state && `, ${location.state}`}
+                                        <span className='text-muted-foreground'>, {location.country}</span>
+                                    </span>
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    )}
+                </CommandList>
+            </CommandDialog>
+        </>
+    )
+}
+
+export default CitySearch;
